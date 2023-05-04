@@ -39,7 +39,7 @@ public class Posts extends BaseTimeEntity {
 ```  
 <br>  
 
-> JPA 제공 어노테이션  
+### JPA 제공 어노테이션  
 
 - `@Entity`
     - 테이블과 링크될 클래스(해당 Posts클래스는 `posts table` 으로 자동적으로 네이밍)
@@ -52,7 +52,7 @@ public class Posts extends BaseTimeEntity {
     - 테이블의 칼럼, 위 코드와 같이 변경이 필요한 경우에만 선언
     - 예를들어, 데이터 타입이 String인 경우 VARCHAR(255)으로 기본 설정됨  
 
-> Lombok 제공 어노테이션  
+### Lombok 제공 어노테이션  
 
 - `@NoArgsConstructor`
     - 기본 생성자 자동 추가
@@ -263,7 +263,7 @@ dependencies {
 
 <br>  
 
-> BaseTimeEntity 생성  
+### BaseTimeEntity 생성  
 
 ```
 package com.hbk.webservice.domain;
@@ -281,7 +281,7 @@ public class BaseTimeEntity {
 }
 ```  
 위 BaseTimeEntity 클래스는 모든 Entity들의 상위(부모) 클래스가 되어 createDate와 modifiedDate를 관리하는 역할을 한다.  
-> BaseTimeEntity 클래스에 사용된 어노테이션  
+### BaseTimeEntity 클래스에 사용된 어노테이션  
 
 - `@MappedSuperClass`
     - Entity 클래스에서 이를 해당 어노테이션이 있는 클래스를 상속할 경우 선언된 필드를 테이블의 칼럼으로 인식
