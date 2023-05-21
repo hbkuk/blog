@@ -151,13 +151,13 @@ public class UserDAO {
     - SELECT * FROM users WHERE name = '%s' AND password = '%s'  
 
 - 완성된 쿼리문
-    - SELECT * FROM users WHERE name = 'Admin' AND password = '' or '1' = '1' #'
+    - SELECT * FROM users WHERE name = 'Olivia Taylor' AND password = '' or '1' = '1' #'
 
 - 결과
     - id : 1, name : Olivia Taylor	, age : 28	, email : olivia@example.com
 ```  
 
-### 결과는, **로그인이 성공**됩니다.  
+### 결과는, **로그인에 성공**하게 됩니다..  
 
 <br>
 
@@ -198,7 +198,7 @@ SELECT * FROM users
 
 <br>
 
-### PreparedStatement를 사용하자
+### 준비된 문장인 PreparedStatement을 사용
 
 `PreparedStatement`를 사용하면, **SQL 인젝션 공격에 방어하기 위해 이러한 특수 문자를 이스케이핑**합니다.  
 
