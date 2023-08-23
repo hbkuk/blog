@@ -41,29 +41,17 @@
 
 테스트의 격리를 더욱 편리하게 처리하기 위해 **`@RepositoryTest`라는 어노테이션을 구현**했습니다.  
 
-![어노테이션 구현](https://github.com/hbkuk/blog/assets/109803585/e1e22aec-dd0a-4d1a-a244-00c606d0d9b5)  
+![어노테이션 구현](https://github.com/hbkuk/now-front/assets/109803585/392c223c-3273-40ef-a33a-ee1ffc23f4bf)  
 
 - `@Target(ElementType.TYPE)`: 클래스 레벨에서 사용할 수 있도록 지정
 - `@Retention(RetentionPolicy.RUNTIME)`: 런타임까지 어노테이션 정보가 유지되도록 설정
 - `@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)`: 랜덤한 포트를 사용하는 Spring Boot 테스트 환경 설정
-- `@Sql("${test-scripts.sql-path}")`: ${test-scripts.sql-path}로 **지정된 경로의 SQL 스크립트를 실행**
+- `@Sql("classpath:testdb.sql")`: **지정된 경로의 SQL 스크립트를 실행**
 - `@ActiveProfiles("test")`: "test" 프로파일 활성화  
 
 <br>
 
-**`${test-scripts.sql-path}`의 경우, ${} 안에 있는 test-scripts.sql-path는 설정 파일에 정의된 test-scripts 섹션의 sql-path 프로퍼티 값을 의미**합니다.  
-따라서, 실행할 스크립트를 application.yml에 아래와 같이 설정했습니다.
-
-```
-
-...
-test-scripts:
-  sql-path: "classpath:testdb.sql"
-```  
-
-<br>
-
-해당 스크립트는 resources 폴더에 위치시켰습니다.  
+실행시키고자 하는 스크립트는 resources 폴더에 위치시켰습니다.  
 
 <p align="center">
   <img src="https://github.com/hbkuk/blog/assets/109803585/b57ac7cf-5595-447f-8268-2478bc22486f" alt="text" width="number" />
