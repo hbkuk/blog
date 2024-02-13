@@ -12,7 +12,7 @@ E2E(API) 테스트 기반의 인수 테스트를 작성해야 하기 때문에, 
 
 따라서, 공부한 내용을 이번 기회에 제대로 정리해보고자 한다.  
 
-
+<br>
 
 ### 테스트 격리가 왜 필요할까?
 
@@ -43,7 +43,9 @@ public class StationLineAcceptanceTest { ... }
 하지만, webEnvironment 속성값이 위와 같이 `WebEnvironment.DEFINED_PORT` 혹은 `WebEnvironment.RANDOM_PORT` 이면,   
 roll back 되지 않는다.  
 
-**Why?** `@Transitional` 어노테이션을 붙인 Thread와 `Spring Boot`가 구동되는 Thread가 서로 다르므로, roll back 시킬 수 없다고 한다.
+**Why?** `@Transitional` 어노테이션을 붙인 Thread와 `Spring Boot`가 구동되는 Thread가 서로 다르므로, roll back 시킬 수 없다고 한다.  
+
+<br>
 
 ### `@DirtiesContext` 
 `@SpringBootTest`를 통한 테스트 수행에서는 `ApplicationContext`를 띄어 진행한다.  
@@ -52,7 +54,9 @@ roll back 되지 않는다.
 따라서, `@DirtiesContext`은 고의로 Bean을 오염시켜 caching 조건에 충족되지 않게 한다. 고로, 테스트 메서드가 실행될 때 마다 Context를 새로 띄우는 것이다.
 하지만, 위에서 언급했듯이 `ApplicationContext`를 새로 띄우는 것은 비용이 큰 작업이다.  
 
-항상 좋지 않을까? 라는 고민을 해봐야한다. (이 부분은 다음에 기회가 된다면 더 찾아보자.) 
+항상 좋지 않을까? 라는 고민을 해봐야한다. (이 부분은 다음에 기회가 된다면 더 찾아보자.)  
+
+<br>
 
 ### `@Sql`
 테스트가 실행될 때마다 테이블들을 truncate 시키는 쿼리를 수행하게 한다. 인수 테스트에서 가장 잘 사용되는 테스트 격리 방법이지 않을까 싶다.  
@@ -73,7 +77,6 @@ TRUNCATE TABLE station_section RESTART IDENTITY;
 -- 외래 키 제약 조건 활성화
 SET REFERENTIAL_INTEGRITY TRUE;
 ```  
-<br>
   
 ```
 // ...Test.java
@@ -83,7 +86,5 @@ SET REFERENTIAL_INTEGRITY TRUE;
 @Sql(value = "/clean.sql", executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 public class ...Test {}
 ```  
-
-<br>
 
 끝으로 .. 테스트 격리 방법을 고민하는, 모든 분들에게 부족하지만 도움이 되셨으면 좋겠다.
