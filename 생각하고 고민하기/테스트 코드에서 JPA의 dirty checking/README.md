@@ -115,6 +115,9 @@ public class MemberService {
 ### Dirty Checking?
 
 ![dirty-checking](https://github.com/hbkuk/blod-code/assets/109803585/0f3dbe52-d755-49f4-93b3-01cf8d8cb7cc)
+[참고: [토크ON세미나] JPA 프로그래밍 기본기 다지기 6강 - JPA 내부구조 | T아카데미](https://www.youtube.com/watch?v=PMNSeD25Qko&ab_channel=SKplanetTacademy)
+
+<br>
 
 > JPA에서는 트랜잭션이 끝나는 시점에 변화가 있는 모든 엔티티 객체를 데이터베이스에 자동으로 반영해줍니다.  
 > 이때, 변화가 있다의 기준은 최초 조회 상태입니다.
