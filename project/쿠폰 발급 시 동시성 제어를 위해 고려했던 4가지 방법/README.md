@@ -266,11 +266,93 @@ public interface CouponRepository extends JpaRepository<Coupon, Long> {
 `Redis`와 같은 외부 저장소를 활용하는 방법일 것으로 예상됩니다.  
 이 부분은 기회가 된다면, 나중에 포스팅 해보겠습니다.
 
+## 별첨) 트랜잭션 격리레벨로 동시성 문제를 해결할 순 없을까?
 
-참고
+`Spring` 에서는 `@Transaction` 어노테이션을 사용할 때, 격리 수준을 설정할 수 있도록 4가지 속성을 지원하고 있습니다.
+
+![트랜잭션으로 해결해보기](https://github.com/hbkuk/blog/assets/109803585/92a41b49-70fd-4dd2-b054-2af5720518cb)
+
+격리 수준은 아래와 같습니다.
+
+1. `READ UNCOMMITTED`
+2. `READ COMMITTED`
+3. `REPEATABLE READ`
+4. `SERIALIZABLE`
+
+번호가 커질수록, 트랜잭션간 **고립 정도가 높아**지나 **성능은 떨어**집니다.
+
+데이터베이스마다 기본 격리 수준은 상이합니다. 아래 내용 참고하시면 좋을 것 같습니다.
+> MySQL: 기본 격리 수준은 REPEATABLE READ이며, 동일한 쿼리를 여러 번 실행해도 항상 동일한 결과를 보장한다.  
+> H2: 기본 격리 수준은 READ COMMITTED이며, 커밋된 다른 트랜잭션의 변경 사항만 읽을 수 있음을 의미한다.(MySQL과는 다르게 기본적으로 더 낮은 격리 수준을 사용)
+
+트랜잭션 격리 수준별로,  
+동시 다발적으로 여러 `Thread`가 쿠폰을 발급한다면 어떤 결과가 나오는지 직접 테스트해보면서 정리해보겠습니다.
+
+테스트 환경은 아래와 같습니다.
+
+- 동시 요청 `Thread`: 10개
+- 발급 가능한 쿠폰 개수: 2개
+
+### READ UNCOMMITTED
+
+**커밋 되지 않은 트랜잭션의 데이터 변경 내용을 다른 트랜잭션이 조회하는 것을 허용**합니다.  
+
+결과는, 9개의 쿠폰이 발급되었습니다.  
+해당 트랜잭션의 격리 수준에서 어떠한 상황이 발생하는지 확인해보겠습니다.  
+
+![격리 수준 READ UNCOMMITTED](https://github.com/hbkuk/blog/assets/109803585/d84af372-bfdd-4062-bb34-c11800f63fbb)
+
+JPA의 `dirty-checking` 으로 인해서 트랜잭션이 커밋하는 시점에, update 쿼리가 실행되다보니 모든 `Thread`가 동일한 데이터를 읽게됩니다.
+
+### READ COMMITTED
+
+**커밋된 트랜잭션의 변경사항만 다른 트랜잭션에서 조회할 수 있도록 허용**합니다.
+
+위에서 언급된 `READ UNCOMMITTED`과 동일하게 9개의 쿠폰이 발급되었습니다.
+
+### REPEATABLE READ
+
+**특정 행을 조회시 항상 같은 데이터를 응답하는 것을 보장**합니다.  
+다만, 데이터가 추가되는 현상(`Phantom Read`)이 발생할 수 있습니다.  
+
+결과가 어떻게 되었을까요?  
+
+1개의 쿠폰이 발급되었고, **`Dead Lock` 이 발생**한 것을 확인했습니다.
+
+![데드락 발생 로그](https://github.com/hbkuk/shop/assets/109803585/7b99311a-318e-452c-9d23-677f41a1c09a)
+
+아무래도 여러 `Thread`간에 **공유 잠금(S Lock)과 배타 잠금(X Lock)을 획득하는 과정에서 발생**한 것으로 예상됩니다.  
+자세한 내용은 추후 업데이트할 예정입니다.
+
+### SERIALIZABLE
+
+**특정 트랜잭션이 사용중인 테이블의 모든 행을 다른 트랜잭션이 접근할 수 없도록 보장**하는 격리 수준입니다.
+
+결과가 어떻게 되었을까요?
+
+`REPEATABLE READ` 와 동일한 결과를 확인할 수 있고, **`Dead Lock` 이 발생**한 것을 확인했습니다.
+
+---
+
+이제 정리하겠습니다.  
+
+> **트랜잭션 격리레벨로 동시성 문제를 해결할 순 없을까?**
+
+트랜잭션 격리 수준은 데이터 일관성을 유지하고 동시에 여러 트랜잭션이 실행될 때 발생할 수 있는 문제를 관리하기 위한 것입니다.  
+동시성 문제를 완전히 해결하기 위해서는 격리 수준 외에도 데이터베이스 락(locking) 및 다른 동시성 제어 메커니즘을 사용해야 합니다.
+
+따라서, **격리 수준은 데이터의 일관성을 보장하기 위한 것이지 트랜잭션 간의 동시성을 완전히 제어하기 위한 것은 아닙니다.** 
+
+
+
+
+
+---
+
+### 참고 
 
 - [풀필먼트 입고 서비스팀에서 분산락을 사용하는 방법 - Spring Redisson](https://helloworld.kurly.com/blog/distributed-redisson-lock/)
 - [Lock을 사용할 때 트랜잭션 범위를 고려하자](https://medium.com/@dori_dori/lock%EC%9D%84-%EC%82%AC%EC%9A%A9%ED%95%A0-%EB%95%8C-%ED%8A%B8%EB%9E%9C%EC%9E%AD%EC%85%98-%EB%B2%94%EC%9C%84%EB%A5%BC-%EA%B3%A0%EB%A0%A4%ED%95%98%EC%9E%90-8f60f4da5248)
 - [InnoDB의 Lock 처리 방식](https://miintto.github.io/docs/mysql-select-for-update)
-
+- [JPA의 낙관적 락과 비관적 락을 통해 엔티티에 대한 동시성 제어하기](https://hudi.blog/jpa-concurrency-control-optimistic-lock-and-pessimistic-lock/)
 </div>
