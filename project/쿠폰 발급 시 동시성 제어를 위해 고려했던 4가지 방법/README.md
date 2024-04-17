@@ -245,25 +245,109 @@ public interface CouponRepository extends JpaRepository<Coupon, Long> {
 
 동시성 제어를 위해 낙관적 락뿐만 아니라, 비관적 락 또한 좋은 방법인 것은 확실한 것 같습니다.
 
+## 쿠폰 발급 관련 동시성 제어를 위해 선택한 방법
+
+쿠폰을 발급하는 방식은 아래와 같이 여러가지 상황이 있는 것으로 알고 있습니다.  
+
+1. 자동 쿠폰 발급(회원가입, 기념일 등) 
+2. 관리자가 회원에게 직접 쿠폰 발급
+3. 한정된 수량의 쿠폰에 대해서 발급 신청한 회원에게 쿠폰 발급
+4. ...
+
+현재 프로젝트 상황에서는, 백 오피스(Back Office)에서 관리자가 직접 회원에게 발급하는 상황이 많습니다.  
+따라서, 트랜잭션 충돌이 상대적으로 적을 것이라는 생각에 우선적으로 낙관적 락을 선택하게 되었습니다.
+
+그렇다면, 위에서 언급했던 낙관적 락을 다시 살펴보겠습니다. 
+
+![image](https://github.com/hbkuk/shop/assets/109803585/6a37271c-013f-4d46-8003-a1f920ee3c40)
+
+JPA는 버전이 변경되었음을 감지하고, 예외를 던진다고 했습니다.  
+그렇다면 해당 예외를 잡아서, `Re-try`를 진행할 수 있도록 구성해보겠습니다.  
+
+기존 프로덕션 코드가 오염되지 않게 `Spring AOP`를 활용해보면 어떨까요?
+
+우선, 아래와 같이 어노테이션을 선언했습니다.
+
+```
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface IsTryAgain {
+    int tryTimes() default 5;
+}
+
+```
+
+아래와 같이 낙관적 락을 사용하는 쿠폰 발급 메서드 상단에 어노테이션을 추가해주었습니다. 
+![image](https://github.com/hbkuk/shop/assets/109803585/f3e5af66-796a-48ae-a90d-85a3db74b004)
+
+
+이제, `Aspect`를 선언해볼까요?
+
+![image](https://github.com/hbkuk/shop/assets/109803585/b41e8cdb-d7c1-413e-bfd3-6ee34901420c)
+
+```
+@Order(1)
+@Setter
+@Aspect
+@Slf4j
+@Component
+public class TryAgainAspect {
+
+    private int maxRetries;
+
+    @Pointcut("@annotation(IsTryAgain)")
+    public void retryOnOptFailure() {
+    }
+
+    @Around("retryOnOptFailure()")
+    public Object doConcurrentOperation(ProceedingJoinPoint joinPoint) throws Throwable {
+        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+        Object target = joinPoint.getTarget();
+        Method currentMethod = target.getClass().getMethod(signature.getName(), signature.getParameterTypes());
+        IsTryAgain annotation = currentMethod.getAnnotation(IsTryAgain.class);
+        this.setMaxRetries(annotation.tryTimes());
+
+        int numAttempts = 0;
+        do {
+            numAttempts++;
+            try {
+                return joinPoint.proceed();
+            } catch (ObjectOptimisticLockingFailureException | StaleObjectStateException exception) {
+                if (numAttempts > maxRetries) {
+                    throw new NoMoreTryException(ErrorType.NO_MORE_TRY);
+                } else {
+                    log.info("0 === retry ===" + numAttempts + "times");
+                }
+            }
+        } while (numAttempts <= this.maxRetries);
+
+        return null;
+    }
+}
+```
+
+`Aspect`를 정의할 때, 우선순위를 더 높게 설정한 이유는 무엇일까요?
+
+![image](https://github.com/hbkuk/shop/assets/109803585/7d0c7aa4-5a83-472b-ac10-75e0f014de82)
+참고: https://docs.spring.io/spring-framework/docs/4.2.x/spring-framework-reference/html/transaction.html
+
+공식문서를 확인해보면 알 수 있듯이, 트랜잭션의 기본 순서는 `Ordered.LOWEST_PRECEDENCE(Integer.MAX_VALUE)` 입니다.
+
+`Custom Aspect`를 트랜잭션 안에서 실행되도록 보장하려면 `Custom Aspect`의 우선순위를 트랜잭션의 우선순위보다 낮게 설정하면 됩니다.
+
+따라서, `@IsTryAgain` 어노테이션이 붙은 메서드에 적용하면 메서드 실행 중 발생한 낙관적 락 관련 예외에 잡아서, 재시도가 이루어지게 됩니다.
+
 ## 분산 DB 환경에서 생각해보기
 
 앞에서, 낙관적 락과 비관적 락을 살펴보았습니다.
 
-서비스를 운영하다보면, 규모가 점점 커져서 분산 DB 환경이 될것으로 예상하는데, 이러한 상황에서 여전히 좋은 솔루션일까요?  
-아래 그림으로 확인해보겠습니다.  
+서비스를 운영하다보면, 규모가 점점 커져서 분산 DB 환경이 될것으로 예상하는데, 이러한 상황에서 여전히 좋은 솔루션일까요?
 
 ![분산 DB](https://github.com/hbkuk/shop/assets/109803585/3ea82b4f-2096-47be-a1ee-cd8bf455f8c1)
 
-일반적인 분산 데이터베이스 구조로는 `Master-slave` 구조입니다.  
 
-> Master-slave 구조란?  
-> 마스터 서버는 데이터의 쓰기 작업을 담당하고, 이 변경 내용을 슬레이브 서버들에 복제(replicate)하여 데이터의 일관성을 유지한다.  
-> 읽기 작업은 슬레이브 서버들이 처리하기 때문에 읽기 부하를 분산시키고 성능을 향상시킬 수 있다.
+분산 DB 환경에서는 빠른 응답이 필요한 경우가 많을텐데, `Redis`와 같은 메모리 기반 데이터 저장소를 사용한다면 요구 사항을 충족시킬 수 있을 것으로 예상됩니다.
 
-이러한 구조에서 Lock을 관리하고 동기화한다는 것은 상상만 해도 어려울 것 같다는 듭니다.  
-이러한 상황에서 더 좋은 솔루션이 무엇일까요?
-
-`Redis`와 같은 외부 저장소를 활용하는 방법일 것으로 예상됩니다.  
 이 부분은 기회가 된다면, 나중에 포스팅 해보겠습니다.
 
 ## 별첨) 트랜잭션 격리레벨로 동시성 문제를 해결할 순 없을까?
@@ -297,7 +381,7 @@ public interface CouponRepository extends JpaRepository<Coupon, Long> {
 
 **커밋 되지 않은 트랜잭션의 데이터 변경 내용을 다른 트랜잭션이 조회하는 것을 허용**합니다.  
 
-결과는, 9개의 쿠폰이 발급되었습니다.  
+결과는, 10개의 쿠폰이 발급되었습니다.  
 해당 트랜잭션의 격리 수준에서 어떠한 상황이 발생하는지 확인해보겠습니다.  
 
 ![격리 수준 READ UNCOMMITTED](https://github.com/hbkuk/blog/assets/109803585/d84af372-bfdd-4062-bb34-c11800f63fbb)
@@ -308,7 +392,7 @@ JPA의 `dirty-checking` 으로 인해서 트랜잭션이 커밋하는 시점에,
 
 **커밋된 트랜잭션의 변경사항만 다른 트랜잭션에서 조회할 수 있도록 허용**합니다.
 
-위에서 언급된 `READ UNCOMMITTED`과 동일하게 9개의 쿠폰이 발급되었습니다.
+위에서 언급된 `READ UNCOMMITTED`과 동일하게 10개의 쿠폰이 발급되었습니다.
 
 ### REPEATABLE READ
 
@@ -317,7 +401,8 @@ JPA의 `dirty-checking` 으로 인해서 트랜잭션이 커밋하는 시점에,
 
 결과가 어떻게 되었을까요?  
 
-1개의 쿠폰이 발급되었고, **`Dead Lock` 이 발생**한 것을 확인했습니다.
+1개의 쿠폰이 발급되었고, **`Dead Lock` 이 발생**한 것을 확인했습니다.  
+또한, 매번 첫번째 트랜잭션만 성공합니다.  
 
 ![데드락 발생 로그](https://github.com/hbkuk/shop/assets/109803585/7b99311a-318e-452c-9d23-677f41a1c09a)
 
