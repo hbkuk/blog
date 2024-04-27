@@ -21,18 +21,18 @@
 ## 쿠폰을 등록하고 발급하는 과정
 
 우선 해당 프로젝트에서, 쿠폰이 어떠한 흐름으로 발급되는지 짚고 넘어가면 좋을 것 같습니다.    
-관리자에 의해서 등록된 쿠폰을 **다수의 회원에게 발급하는 과정을 아래와 같이 시퀀스 다이어그램**으로 표현해 보았습니다.  
+**다수의 회원에게 쿠폰을 발급하는 과정을 시퀀스 다이어그램**으로 표현해 보았습니다.  
 
 ![쿠폰 발급 시퀀스 다이어그램](https://github.com/hbkuk/blod-code/assets/109803585/520ff364-8e5f-4215-a110-c27a7f6d1463)
 
-비즈니스 로직에 대해서 간단하게 설명해보겠습니다.  
+부연 설명을 추가해보겠습니다.  
 
-1. 관리자는 쿠폰을 발급하기 위해서 **쿠폰을 등록해야 합니다(이미 등록된 쿠폰으로 발급할 수 있습니다.).**
-2. 쿠폰을 등록할 때, **몇 장의 쿠폰을 발급할 것인지 수량을 설정**합니다.
-3. 쿠폰이 등록되면 관리자는 **회원(회원들)에게 쿠폰을 발급**합니다.
+1. 관리자는 쿠폰을 발급하기 위해서 **쿠폰을 등록해야 한다.(이미 등록된 쿠폰으로 발급할 수 있다.)**
+2. 쿠폰을 등록할 때, **발급할 수량을 설정**한다.
+3. 쿠폰이 등록되면 관리자는 **회원(회원들)에게 쿠폰을 발급**한다.
 
 여기까지 충분히 이해하셨을 것이라고 생각하고,  
-다음으로 쿠폰 발급 정보를 저장하는 프로덕션 코드를 살펴보겠습니다.
+다음으로 쿠폰 발급 정보를 저장하는 **프로덕션 코드를 살펴보겠습니다.**
 
 ## `saveAll()` 메서드로 대량의 쿠폰 발급하기
 
@@ -42,11 +42,11 @@
 
 ![saveAll 메서드](https://github.com/hbkuk/blod-code/assets/109803585/50f043a4-390a-4b0b-b79d-90373062faf6)    
 
-이 메서드를 활용해서 쿠폰을 발급하는 프로덕션 코드를 아래와 같이 구성했습니다.
+이 메서드를 활용한 쿠폰을 발급하는 프로덕션 코드입니다.
 
 ![image](https://github.com/hbkuk/blod-code/assets/109803585/bf3a94b1-4eef-477c-8538-739d6f9252dc)
 
-위 코드로 대량의 쿠폰을 발급할 경우, 어떤 쿼리가 실행될까요?  
+**위 코드로 대량의 쿠폰을 발급할 경우, 어떤 쿼리가 실행될까요?**  
 
 ...
 
@@ -119,7 +119,7 @@ public class SimpleJpaRepository<T, ID> implements JpaRepositoryImplementation<T
 ```
 
 위 `saveAll()` 메서드의 내부 코드를 확인해보면, `List`를 순회하면서 내부적으로 `save()` 메서드를 호출하고 있습니다.    
-따라서, `save()` 메서드를 100번 실행시키는 것과 100개의 `Entity`로 `saveAll()` 메서드를 1번 실행시키는 것은 동일하다고 볼 수 있습니다.       
+따라서, `save()` 메서드를 100번 실행시키는 것과 100개의 `Entity`로 `saveAll()` 메서드를 1번 실행시키는 것은 동일하다고 볼 수 있습니다.
 
 그렇다면 `Bulk Insert`  방식으로 쿠폰이 발급 처리될 수 있도록, 다른 방법을 찾아보겠습니다.
 
@@ -135,8 +135,6 @@ public class SimpleJpaRepository<T, ID> implements JpaRepositoryImplementation<T
 `application.yml` 파일에 아래와 같이 적용해보겠습니다.
 
 ```
-// ...
-
 spring:
   jpa:
     properties:
@@ -159,14 +157,15 @@ spring:
 혹시라도, 삭제한 의도를 모르시는 분들을 위해 `PERSIST` 옵션에 대해서 아래 간단하게 작성해보겠습니다.
 
 > ### PERSIST  
-> 이는 엔티티를 영속화할 때 연관된 엔티티도 함께 영속화하는 옵션입니다.
-> ```
-> Post post = new Post();
-> Comment comment = new Comment();
-> post.addComment(comment);
-> entityManger.persist(post); // post, comment 둘 다 영속화
-> ```
-> 상세한 내용을 알아보고 싶은 분이 계시다면 [JPA Cascade는 무엇이고 언제 사용해야 할까?](https://tecoble.techcourse.co.kr/post/2023-08-14-JPA-Cascade/)을 참고하시면 좋을 것 같습니다.  
+> 이는 엔티티를 영속화할 때 연관된 엔티티도 함께 영속화하는 옵션입니다.  
+
+```
+Post post = new Post();
+Comment comment = new Comment();
+post.addComment(comment);
+entityManger.persist(post); // post, comment 둘 다 영속화
+``` 
+더 자세한 내용을 알아보고 싶은 분이 계시다면 [JPA Cascade는 무엇이고 언제 사용해야 할까?](https://tecoble.techcourse.co.kr/post/2023-08-14-JPA-Cascade/)을 참고하시면 좋을 것 같습니다.
 
 이 옵션을 활용해서, `Coupon` Entity의 `issueCoupon()` 메서드는 발급할 쿠폰을 모두 추가합니다.  
 그렇다면, JPA의 `dirty checking`으로 인해 트랜잭션이 커밋하는 시점에 insert 쿼리가 실행됩니다.
@@ -203,7 +202,7 @@ public class Coupon {
 ![image](https://github.com/hbkuk/blod-code/assets/109803585/e4075e76-a0af-4a3b-b181-54fa16d9e5ed)
 
 `Hibernate`의 공식문서를 확인해서 Batch 설정을 제대로 했는데 왜 `Single insert` 쿼리가 실행 될까요?  
-확인해보니, 아래와 같이 자동 생성 전략을 `IDENTITY`으로 설정되어 있을 경우, Batch 처리가 불가능하다고 합니다.
+확인해보니, 아래와 같이 자동 생성 전략을 `IDENTITY`으로 설정했을 경우, Batch 처리가 불가능하다고 합니다.
 
 ![image](https://github.com/hbkuk/blod-code/assets/109803585/50128cf5-3ac9-44b4-8177-1d1b6fadedb9)
 
@@ -221,7 +220,7 @@ public class Coupon {
 더 궁금하시는 분들은 [Why does Hibernate disable INSERT batching when using an IDENTITY identifier generator](https://stackoverflow.com/questions/27697810/why-does-hibernate-disable-insert-batching-when-using-an-identity-identifier-gen)을 참고하시면 좋을 것 같습니다.  
 
 추가적으로 `IDENTITY` 전략을 사용할 경우,  
-**데이터베이스로 부터 기본 키를 어느 시점에 할당받는지?** 내부적으로 궁금하시는 분들은 [JPA saveAll이 Bulk INSERT 되지 않았던 이유](https://imksh.com/113)을 참고하면 좋을 것 같습니다.    
+**데이터베이스로부터 기본 키를 어느 시점에 할당받는지?** 내부적으로 궁금하시는 분들은 [JPA saveAll이 Bulk INSERT 되지 않았던 이유](https://imksh.com/113)을 참고하면 좋을 것 같습니다.    
 
 ## 기본 키의 자동 생성 방식을 `UUID`로 변경하기
 
@@ -288,14 +287,17 @@ spring:
         (?, ?, ?, ?, ?, ?)
 2024-04-24 20:39:45.765  INFO 12420 --- [           main] MySQL                                    : [QUERY] insert into issued_coupon (coupon_id, expired_at, issued_at, member_email, status, coupon_code) values (1, '2024-05-24 20:39:45.702775', '2024-04-24 20:39:45.702775', 'd7af7714-d628-4e85-9e0c-f91ea9b72fd8@yahoo.com', 'ACTIVE', x'b84cef43c2ce48a192d402c024865448') [Created on: Wed Apr 24 20:39:45 KST 2024, duration: 2, connection-id: 1494, statement-id: 0, resultset-id: 0,	at com.zaxxer.hikari.pool.ProxyStatement.executeBatch(ProxyStatement.java:127)]
 ```
-마지막에 출력된 로그를 보면 알 수 있듯이, Batch(Bulk Insert) 방식으로 실행된 것을 확인할 수 있습니다.
+마지막에 출력된 로그를 보면 알 수 있듯이, **`Batch(Bulk Insert)`** 방식으로 실행된 것을 확인할 수 있습니다.
 
 ![image](https://github.com/hbkuk/blod-code/assets/109803585/5c233ba5-7778-46e2-8c62-bd1cfaf78d78)
 
-또한, 로그를 분석해보면 몇가지 사실을 확인해볼 수 있습니다.    
-`Hibernate`는 배치 설정 여부와 관계없이 `Single insert` 쿼리를 출력합니다.  
+또한, 로그를 분석해보면 몇가지 사실을 확인해볼 수 있습니다.  
 
-따라서, `Hibernate`는 Drvier가 하나의 쿼리로 재작성해서 한방 쿼리로 전송하는 것을 모른다는 것입니다.  
+### Hibernate는 쿼리가 재작성되는 모른다.
+
+어쩌면 당연한 이야기일 수 도 있겠지만,  
+`Hibernate`는 배치 설정 여부와 관계없이 `Single insert` 쿼리를 출력합니다.    
+따라서, `Hibernate`는 **Drvier가 하나의 쿼리로 재작성해서 한방 쿼리로 전송하는 것을 모른다는 것입니다.**  
 
 그렇다면 이제 정리를 해볼까요?
 
@@ -328,7 +330,9 @@ public void testCode() {
 }
 ```
 
-개인적으로 테스트 코드에 영향을 주지않으면서, 정확한 시간을 측정하는 방법을 사용하는 것이 좋다고 생각합니다.   
+개인적으로 테스트 코드에 영향을 주지않으면서, 정확한 시간을 측정하는 방법을 사용하는 것이 좋다고 생각합니다.  
+따라서, 기존 테스트 코드에 영향을 주지않으면서, 시간을 측정하는 방법을 소개해드립니다.  
+
 아래는 간단한 애플리케이션 설정으로 로깅되는 정보입니다.  
 
 ![image](https://github.com/hbkuk/blod-code/assets/109803585/7a9c9de1-a0b4-4ef4-8273-b402481c4f95)
