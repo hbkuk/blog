@@ -3,7 +3,7 @@
 # 강결합된 구조를 이벤트 기반 구조로 변경하기(with. 트랜잭션 분리)
 
 쿠폰(`Coupon`) 발급 시 해당 회원에게 알림이(`Notification`) 발송되어야 하는 요구사항으로 인해 **기존 프로덕션 코드가 수정되어야 했습니다.**    
-<small>* 알림: 서비스 내 알림함, 메일, SNS 알림 등을 의미합니다.</small>  
+<small>* 알림: 서비스 내 알림, 메일, SNS 알림 등을 의미합니다.</small>  
 
 해당 요구사항을 파악 후 기존 쿠폰 서비스 객체에 알림 서비스 객체를 추가하는 방향을 고려했습니다.  
 
@@ -13,13 +13,12 @@
 
 ![image](https://github.com/hbkuk/shop/assets/109803585/fe3ca8ee-9325-4303-92e6-e7faa73d61e5)
 
-**하나의 트랜잭션으로 진행되다보니, 다음과 같은 문제점을 발견했습니다.**  
+하나의 트랜잭션으로 진행되다보니, 다음과 같은 문제점을 발견했습니다.  
 
 1. 보조 업무인 **알림 발송이 실패할 경우**, 핵심 업무인 **쿠폰 발급이 실패할 수 있다.**   
+    - <small>핵심 업무(Core Business): 쿠폰을 발급하는 로직</small>
+   - <small>보조 업무(Auxiliary Business): 쿠폰이 발급되었다는 알림을 발송하는 로직</small>
 2. 알림 발송이 지연될 경우, **롱 트랜잭션(`Long Transaction`)으로 진행되어 트랜잭션 경합이 발생할 수 있다.**
-
-<small>핵심 업무(Core Business): 쿠폰을 발급하는 로직</small>  
-<small>보조 업무(Auxiliary Business): 쿠폰이 발급되었다는 알림을 발송하는 로직</small>
 
 이러한 문제점을 해결하기 위해서, 강결합된 구조를 약결합된 구조로 변경해야만 했습니다.    
 결론적으로는 약결합된 구조로 변경하기 위해서 `Spirng Event`를 활용했습니다.  
@@ -39,8 +38,8 @@
 
 ![강하게 결합된 서비스 코드](https://github.com/hbkuk/shop/assets/109803585/d088acec-4dff-4a67-852f-9b9936c9539a)
 
-테스트 코드를 작성해서 확인해볼까요?    
-사전에 관리자, 회원, 쿠폰을 생성 후 쿠폰을 발급하는 서비스 메서드를 호출해서 확인해보겠습니다.    
+테스트 코드를 작성해서 쿠폰 발급 시 알림이 발송되는지 확인해볼까요?  
+성공, 실패 케이스 모두 작성해보았습니다.   
 
 ![image](https://github.com/hbkuk/shop/assets/109803585/d2f36327-33d4-4ce1-a146-bfdcbbf9a8b7)
 
@@ -53,7 +52,7 @@
 
 ### 보조 업무가 실패할 경우, 핵심 업무가 실패하는 상황
 
-정상적으로 쿠폰 발급이 진행되는 상황입니다.    
+아래 사진은 정상적으로 쿠폰 발급이 진행되는 상황입니다.    
 
 ![image](https://github.com/hbkuk/shop/assets/109803585/fb614301-3ff7-4048-88d0-d9be31c229eb)
 
@@ -62,16 +61,18 @@
 **쿠폰의 수량이 부족**하거나 **발급할 수 없는 삭제, 발급 중단 상태**일 경우를 예로 들수 있습니다.  
 그렇다면, 알림 또한 발송되지 않도록 처리해야합니다.    
 
+우선 쿠폰을 발급하다가 실패하는 경우를 확인해보겠습니다.  
+
 ![image](https://github.com/hbkuk/shop/assets/109803585/6c638b82-b3f3-4e2b-b227-c0475b7338c2)
 
-하지만, 쿠폰이 정상적으로 발급되었으나 알림이 발송이 실패하는 상황은 어떻게 처리하면 좋을까요?    
+쿠폰이 정상적으로 발급되었으나 알림이 발송이 실패하는 상황을 확인해보겠습니다.        
 
 ![image](https://github.com/hbkuk/shop/assets/109803585/de0b8845-e94f-42dc-b947-38947aace326)
 
 위처럼 알림 발송이 실패한 경우, 쿠폰 발급 또한 실패했다고 처리하는 것이 좋은 방향일까요?    
-**알림 발송만 따로 재시도하도록 처리하는게 좋은 방향이지 않을까요?**    
+**알림 발송만 재시도하도록 처리하는게 좋은 방향이지 않을까요?**    
 
-이와 같은 문제점이 발견되었습니다. 그렇다면 다른 문제점도 확인해보겠습니다.  
+다른 문제도 상세하게 확인해보겠습니다.  
 
 ### 롱 트랜잭션(`Long Transaction`)으로 진행되어 트랜잭션 경합 발생
 
@@ -79,28 +80,28 @@
 
 ![image](https://github.com/hbkuk/shop/assets/109803585/4ad25315-f571-4352-92f9-9268a11d08fb)
 
-쿠폰 발급은 비교적 빠르게 처리되었지만, 알림 발송은 네트워크 지연으로 인해 많은 시간이 소요되었다면 어떻게 될까요?  
+쿠폰 발급은 비교적 빠르게 처리되었지만, **알림 발송은 네트워크 지연으로 인해 많은 시간이 소요**되었다면 어떻게 될까요?  
 만약 쿠폰을 발급하는 과정에서 테이블 전체에 `Lock`을 걸었다면요?  
 
-다른 트랜잭션은 해당 트랜잭션이 종료(commit)될 때까지 대기하는 상황이 발생하게 되는데요.  
-이는 서비스의 성능 저하로 이어지게 됩니다.  
+다른 트랜잭션은 해당 트랜잭션이 종료(`commit`)될 때까지 대기하게되는 상황이 발생하게 되는데요.  
+이는 서비스의 성능 저하로 이어지게 될 것으로 예상됩니다.  
 
 이는 과연 좋은 설계라고 할 수 있을까요?  
 두 문제를 모두 해결할 수 있는 방법은 무엇일까요?      
 
 우선 두 문제 모두 하나의 트랜잭션으로 진행되는 것에서 발생되는 문제이므로,  
-트랜잭션을 분리할 수 있는 방법 중 시도해볼만한 방법은 **전파 속성일 것으로 예상됩니다.**
+트랜잭션을 분리할 수 있는 방법 중 시도해볼 만한 방법은 **전파 속성일 것으로 예상됩니다.**
 
-## 트랜잭션 전파 속성(Transaction propagation)을 활용해보기
+## 트랜잭션 전파 속성(Transaction propagation) 활용
 
 전파 속성을 활용해서 기존 트랜잭션을 분리하는 방향으로 진행해보겠습니다.    
 
 `Spring`에서 다음과 같이 총 7가지의 전파 속성을 제공하고 있습니다.   
 
 ![image](https://github.com/hbkuk/shop/assets/109803585/da77a3bd-b2e0-4de0-a972-fcdc78bb8207)
-<small>참고: [[Spring] 스프링의 트랜잭션 전파 속성(Transaction propagation) 완벽하게 이해하기](https://mangkyu.tistory.com/269)</small>
+<small>출처: [[Spring] 스프링의 트랜잭션 전파 속성(Transaction propagation) 완벽하게 이해하기](https://mangkyu.tistory.com/269)</small>
 
-7가지의 전파 속성 중 트랜잭션이 항상 새로 생성되는 것은 `REQUIRES_NEW`, `NESTED` 입니다.   
+7가지의 전파 속성 중 트랜잭션이 **항상 새로 생성되는 것은 `REQUIRES_NEW`, `NESTED`** 입니다.   
 그렇다면 트랜잭션이 분리된다는 의미이기도 하니, 기존 코드에 전파 속성을 추가해볼까요?  
 
 ### REQUIRES_NEW: 항상 새로운 트랜잭션 생성
@@ -137,9 +138,11 @@
 
 ![image](https://github.com/hbkuk/shop/assets/109803585/93e1e950-3329-49e5-9fc5-57dc0dc0b225)
 
-확인해보니 트랜잭션이 분리되어 있는 것이지, `Thread`가 분리되어서 독립적으로 실행되는 것이 아니었습니다.  
+잘 생각해보면 트랜잭션이 분리되어 있는 것이지, `Thread`가 분리되어서 독립적으로 실행되는 것이 아니었습니다.  
 
 다시 정리해보자면, **자식 트랜잭션에서 예외가 발생했고 해당 예외를 잡아서 적절한 처리를 하지 않자 부모 트랜잭션까지 전파**된 것입니다.    
+
+다른 전파 속성으로 시도해볼까요?  
 
 ### NESTED: 중첩(자식) 트랜잭션 생성
 
@@ -154,7 +157,7 @@
 2. 알림 발송이 실패하는 경우, 쿠폰은 정상적으로 발급된다.
 
 아주 좋은 방법을 찾은 것 같습니다.    
-그렇다면, `NESTED` 전파 속성을 통해 두 가지 문제 중 첫 번째 문제는 해결 가능한 것으로 정리하면 되겠네요.  
+그렇다면, `NESTED` 전파 속성을 통해 **두 가지 문제 중 첫 번째 문제는 해결 가능한 것으로 정리**하면 되겠네요.  
 
 - [X] 보조 업무인 알림 발송의 실패로 인해, 핵심 업무인 쿠폰 발급이 실패하지 않아야 한다.  
 - [ ] 핵심 업무인 쿠폰 발급과 보조 업무인 알림 발송은 서로 다른 트랜잭션으로 실행되어야 한다.
@@ -162,7 +165,7 @@
 하지만, [공식문서](https://docs.spring.io/spring-framework/docs/4.3.4.RELEASE/javadoc-api/index.html?org/springframework/orm/hibernate5/HibernateTransactionManager.html)를 확인해보면 `Hibernate`는 중첩된 트랜잭션을 지원하지 않는다고 합니다.   
 
 ![image](https://github.com/hbkuk/shop/assets/109803585/523cf843-4f44-4578-8cc7-a4ee0f8b5733)
-참고: [https://docs.spring.io/spring-framework/docs/4.3.4.RELEASE/javadoc-api/index.html?org/springframework/orm/hibernate5/HibernateTransactionManager.html](https://docs.spring.io/spring-framework/docs/4.3.4.RELEASE/javadoc-api/index.html?org/springframework/orm/hibernate5/HibernateTransactionManager.html)
+출처: [https://docs.spring.io/spring-framework/docs/4.3.4.RELEASE/javadoc-api/index.html?org/springframework/orm/hibernate5/HibernateTransactionManager.html](https://docs.spring.io/spring-framework/docs/4.3.4.RELEASE/javadoc-api/index.html?org/springframework/orm/hibernate5/HibernateTransactionManager.html)
 
 그렇다면, 트랜잭션의 전파 속성으로는 두 문제 모두 해결할 수 없다고 결론을 내리겠습니다.  
 
@@ -275,16 +278,17 @@ public class NotificationEventHandler {
 
 ![image](https://github.com/hbkuk/shop/assets/109803585/095cab4c-1e9a-4369-9669-5cb2fa4d0f7c)
 
-기능이 정상적으로 구현되었음을 확인습니다. 
+기능이 정상적으로 구현되었음을 확인했습니다.   
+아래 흐름도 같이 확인해주시면 좋을 것 같습니다.  
 
 ![image](https://github.com/hbkuk/shop/assets/109803585/8f357aed-c9ce-41fd-af25-c64ee282061c)
 
-하지만 여전히 두 문제를 해결하지 못했습니다.
+하지만 여전히 두가지 문제를 해결하지 못했습니다.
 
 - [ ] 보조 업무인 알림 발송의 실패로 인해, 핵심 업무인 쿠폰 발급이 실패하지 않아야 한다.
 - [ ] 핵심 업무인 쿠폰 발급과 보조 업무인 알림 발송은 서로 다른 트랜잭션으로 실행되어야 한다.
 
-위 흐름을 살펴보다보니, 하나의 트랜잭션 안에서 동기적으로 동작하는 것으로 확인할 수 있습니다.     
+위 흐름도를 보면, 하나의 트랜잭션 안에서 동기적으로 동작하는 것으로 확인할 수 있습니다.     
 비동기적으로 동작하게 한다면, 두 문제를 해결할 수 있을 것으로 예상됩니다.  
 
 ### Spring Event
@@ -293,25 +297,26 @@ public class NotificationEventHandler {
 즉, 이벤트가 발행되면 모든 `Listener`가 이벤트 처리를 완료할 때까지 `Thread`가 차단된 후 진행되는 것을 의미합니다.  
 
 ![image](https://github.com/hbkuk/shop/assets/109803585/7cd3d9bd-da75-421e-875e-bc84604a57ac)
-<small>참고: https://medium.com/@cizek.jy/spring-events-make-your-code-more-flexible-946951ba8e9f</small>  
+<small>출처: https://medium.com/@cizek.jy/spring-events-make-your-code-more-flexible-946951ba8e9f</small>  
 
-비동기적으로 동작하게 변경해보겠습니다.  
+그렇다면 비동기적으로 동작하게 변경해보겠습니다.  
 
 ### Async 
 
 동기적으로 동작하는 `Spring Event`를 비동기적으로 동작하도록 설정하기 위해서 다음과 같은 설정이 필요합니다.
 
-1. `@EnableAsync` 어노테이션 추가  
+- `@EnableAsync` 어노테이션 추가  
    ![image](https://github.com/hbkuk/shop/assets/109803585/2f3600a8-0aaf-4700-ad77-a163a814f736)
 
-2. 비동기적으로 동작해야 하는 `Listener`에 `@Async` 어노테이션 추가  
+- 비동기적으로 동작해야 하는 `Listener`에 `@Async` 어노테이션 추가  
    ![image](https://github.com/hbkuk/shop/assets/109803585/6c806d33-68d3-4976-8e5e-d824a8df7d3e)
 
-그렇다면 다음과 같이 비등기적으로 동작합니다.    
+그렇다면 다음과 같이 비동기적으로 동작합니다.    
 
 ![image](https://github.com/hbkuk/shop/assets/109803585/7d7a8af8-b140-4385-9c89-c888735ae4fe)
+<small>출처: https://medium.com/@cizek.jy/spring-events-make-your-code-more-flexible-946951ba8e9f</small>  
 
-비동기 설정까지 했으니, 두 문제를 해결할 수 있을까요?  
+비동기 설정까지 했으니, 두가지 문제를 해결할 수 있다고 정리할 수 있습니다.   
 
 - [X] 보조 업무인 알림 발송의 실패로 인해, 핵심 업무인 쿠폰 발급이 실패하지 않아야 한다.
 - [X] 핵심 업무인 쿠폰 발급과 보조 업무인 알림 발송은 서로 다른 트랜잭션으로 실행되어야 한다.
@@ -321,6 +326,8 @@ public class NotificationEventHandler {
 ![image](https://github.com/hbkuk/shop/assets/109803585/256f2f47-999c-4522-9f9b-1fb505cb58e3)
 
 쿠폰 발급 중 예외가 발생하여 트랜잭션이 `roll-back` 되었음에도 알림이 전송되는 문제가 있습니다.  
+즉, 핵심 업무가 실패했지만 보조 업무는 성공하는 상황입니다.  
+
 이는 비동기적으로 실행되면서 트랜잭션이 분리되어 발생하는 현상입니다.  
 이 문제를 해결하기 위해서는 특정 트랜잭션이 정상적으로 종료될 때까지 이벤트 처리를 지연시키면 될 것으로 예상됩니다.
 
@@ -334,16 +341,16 @@ public class NotificationEventHandler {
 `phase` 속성은 아래 내용을 참고해주세요.  
 
 ![image](https://github.com/hbkuk/shop/assets/109803585/3383cf3a-d2ba-49b2-94bf-1591a28cfca7)  
-<small>참고: https://medium.com/@cizek.jy/spring-events-make-your-code-more-flexible-946951ba8e9f</small>
+<small>출처: https://medium.com/@cizek.jy/spring-events-make-your-code-more-flexible-946951ba8e9f</small>
 
 `phase` 속성 값은 4가지이며, 일반적으로 `AFTER_COMMIT` 이 적용하기 적합한 경우가 많다고 합니다.  
 
-- BEFORE_COMMIT(트랜잭션 commit 되기전)
-- AFTER_COMMIT(트랜잭션이 성공했을 때 실행)
-- AFTER_ROLLBACK(트랜잭션 롤백시 실행)
-- AFTER_COMPLETION(트랜잭션 완료시 실행(AFTER_COMMIT+AFTER_ROLLBACK))
+- `BEFORE_COMMIT`(트랜잭션 commit 되기전)
+- `AFTER_COMMIT`(트랜잭션이 성공했을 때 실행)
+- `AFTER_ROLLBACK`(트랜잭션 롤백시 실행)
+- `AFTER_COMPLETION`(트랜잭션 완료시 실행(`AFTER_COMMIT+AFTER_ROLLBACK`))
 
-현재 상황에서 적합한 속성 값은 `AFTER_COMMIT` 이므로 적용해보겠습니다.  
+현재 상황에서 적합한 속성 값은 `AFTER_COMMIT` 이므로 다음과 같이 적용해보겠습니다.  
 
 ![image](https://github.com/hbkuk/shop/assets/109803585/d9b321cd-9fbb-4fbc-b3ae-f98cfe4035e6)
 
@@ -357,7 +364,7 @@ public class NotificationEventHandler {
 ![image](https://github.com/hbkuk/shop/assets/109803585/a4d0b6a4-2166-4443-89b8-9dadb9f3fdb0)
 
 위 흐름을 살펴보면 하나의 `Thread`에서 트랜잭션이 종료 후, 새로운 트랜잭션이 다시 시작되었습니다.    
-하지만 트랜잭션이 종료되었으므로 이미 데이터베이스 커넥션을 반납했다는 의미이기도 합니다.  
+하지만 기존 트랜잭션이 종료될 때, 이미 데이터베이스 커넥션을 반납했다는 의미이기도 합니다.  
 
 따라서, 새로운 트랜잭션에서 작업한 내용은 데이터베이스에 반영이 되지 않습니다.   
 
@@ -370,6 +377,12 @@ public class NotificationEventHandler {
 따라서, 이벤트 리스너를 별도의 `Thread`에서 진행하도록  `@Async` 어노테이션을 추가해주는 방법을 선택했습니다.  
 
 ![image](https://github.com/hbkuk/shop/assets/109803585/16d46cda-0b1c-45b9-aac1-2d3971d0052c)
+
+
+### 마무리
+
+지금까지 여러가지 시도 끝에 **약결합된 구조로 변경하기까지의 과정을 소개해드렸습니다.  
+많은 분들에게 제 경험이 도움이 되었기를 바랍니다. :)
 
 ---
 ### 참고 
