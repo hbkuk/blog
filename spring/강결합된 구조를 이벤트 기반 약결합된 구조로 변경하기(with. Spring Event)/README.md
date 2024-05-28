@@ -378,10 +378,13 @@ public class NotificationEventHandler {
 
 ![image](https://github.com/hbkuk/shop/assets/109803585/16d46cda-0b1c-45b9-aac1-2d3971d0052c)
 
+별도의 `Thread`로 동작하는 상황을 다음과 같이 표현해보았습니다. 
+
+![image](https://github.com/hbkuk/shop/assets/109803585/a08adba9-81c6-4fec-a3e7-c49e24382a77)
 
 ### 마무리
 
-지금까지 여러가지 시도 끝에 **약결합된 구조로 변경하기까지의 과정을 소개해드렸습니다.  
+지금까지 여러가지 시도 끝에 **약결합된 구조로 변경하기까지의 과정**을 소개해드렸습니다.  
 많은 분들에게 제 경험이 도움이 되었기를 바랍니다. :)
 
 ---
