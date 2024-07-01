@@ -14,22 +14,23 @@
 > 클라이언트에서 `Server Error` 응답을 받았지만,  
 > 슬랙 채널로 알림이 오지 않는데요?  
 
-분명, 
-`local`(로컬) 환경에서 테스트를 진행했었고, `dev`(개발) 환경에 정상적으로 배포되었는데 말이죠.
+분명, `local`(로컬) 환경에서 테스트를 진행했었고, `dev`(개발) 환경에 정상적으로 배포되었는데 말이죠.
 
 디버깅을 해보면서 확인해보니, 특정 `Exception Handler Method`에서만 슬랙 채널로 알림을 발송하지 않았어요.  
 
 음... 무엇이 문제였을까요?    
 
-결론적으로는, 상위(부모) 클래스를 `override`한`Exception Handler Method`만 `Cglib Proxy`에 포함되지 않았던 것이었어요.  
+결론적으로는, 상위(부모) 클래스를 `override`한`Exception Handler Method`만 `Cglib Proxy`에 포함되지 않아서 알림이 발송되지 않았던 것이었어요.  
+
 해당 포스팅은 **왜 `Cglib Proxy` 포함되지 않았던 것인지?** 분석을 해보았던 내용을 정리해보았어요.
 
 ## 프로젝트는 어떤 구조였는지?
 
 먼저, 공통된 예외를 처리하는 `GlobalExceptionHandler` 에 대해서 먼저 살펴보는 것이 좋겠네요.  
-(사내 프로젝트의 코드를 그대로 가져올 수 없어서, 최대한 간략한 코드로 대체할게요.)
+(사내 프로젝트의 코드를 그대로 가져올 수 없어서, 최대한 간략한 작성한 코드로 대체할게요.)
 
-![Global Exception Adivce 구조](https://github.com/hbkuk/blog/assets/109803585/b88f4b2b-db7f-4234-ba63-17f3f7056467)
+![Global Exception Advice 구조](https://github.com/hbkuk/blog/assets/109803585/e4992e2b-6e47-4ec0-9895-b3d9ef76a5bd)
+
 
 ```
 @RestControllerAdvice
@@ -59,10 +60,10 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
 }
 ```
 
-제보를 받은 후,  
-디버깅을 해보면서 확인을 해보니 `handleExceptionInternal` 메서드에서만 슬랙 채널로 알림이 발송되지 않았어요.  
+디버깅을 통해 실행 흐름을 확인해보니 `handleExceptionInternal` 메서드에서만 슬랙 채널로 알림이 발송되지 않았어요.    
+그렇다면 `@SlackLogger` 어노테이션을 통해 어드바이스가 제대로 적용되지 않았다는 것인데요.  
 
-우선 `handleExceptionInternal`메서드에 왜 `@Override` 어노테이션이 적용되었는지 확인해볼게요.  
+코드를 자세히 들여다보니, 이전에는 별 생각없던 `@Override` 어노테이션이 적용된 이유가 궁금했어요.    
 
 ## `ResponseEntityExceptionHandler` 상속
 
@@ -94,7 +95,7 @@ protected ResponseEntity<Object> handleExceptionInternal(
 	return new ResponseEntity<>(body, headers, status);
 }
 ```
-
+ 
 그렇다면 상속을 통해 예외가 발생하면 `ResponseEntity`를 생성 후 사용자에게 응답하는데,  
 `GlobalExceptionAdvice` 클래스에서 메서드를 재정의하는 것에 대해서 의문을 가지실 수 있을 것 같아요.  
 
@@ -103,7 +104,7 @@ protected ResponseEntity<Object> handleExceptionInternal(
 간단하게 설명드리자면, 프로젝트의 개발자분들과 에러 응답 형식을 협의했었어요.  
 따라서, 사내 서비스의 에러 응답 형식에 맞게 변경하기 위함이었습니다.
 
-그렇다면 왜 해당 메서드가 실행될 때만, 슬랙으로 알림이 발송되지 않았던 것일까요?  
+그렇다면 왜 재정의한 메서드가 실행될 때만, 슬랙 알림 발송 어드바이스가 적용되지 않았던 것일까요?    
 
 혹시 놓치고 있었던 부분이 있었을까요?  
 
@@ -133,7 +134,7 @@ logging:
 ```
 
 로그를 확인해보니,**`CGLIB`을 사용하여 프록시를 생성**할 때 경고가 발생한 것을 확인할 수 있었어요.  
-경고 내용은,  `ResponseEntityExceptionHandler` 클래스의 `handleException` 메서드는 `final` 메서드이기 때문에 `CGLIB`을 사용하여 프록시할 수 없다는 것을 알려주고 있습니다.  
+경고 내용은  `ResponseEntityExceptionHandler` 클래스의 `handleException` 메서드는 `final` 메서드이기 때문에 `CGLIB`을 사용하여 프록시할 수 없다는 것을 알려주고 있습니다.  
 
 그렇다면 `CGLIB`이 도대체 뭐길래 프록시를 생성할 수 없다는 것일까요?    
 우선, `CGLIB`이라는 것이 무엇인지 확인해볼게요.
@@ -228,8 +229,8 @@ public class CGLIBProxyTest {
 
 `CGLIB`을 통해 프록시 객체를 생성하는 방식은 내부적으로 부모 클래스를 상속받아 진행됩니다.
 
-따라서, `CGLIB`을 사용하여 프록시를 생성할 때 발생했던 경고의 원인을 이해할 수 있습니다.  
-`final` 키워드가 붙은 메서드는 하위 클래스에서 오버라이딩할 수 없으므로, `CGLIB`을 사용하여 프록시를 생성할 수 없었던 것입니다.      
+따라서, `CGLIB`을 사용하여 프록시를 생성할 때 발생했던 경고의 원인을 이해할 수 있어요.    
+`final` 키워드가 붙은 메서드는 하위(자식) 클래스에서 오버라이딩할 수 없으므로, `CGLIB`을 사용하여 프록시를 생성할 수 없었던 것입니다.      
 ![image](https://github.com/hbkuk/blog/assets/109803585/e0f26628-f0fd-4274-b44e-7444e60b9877)
 
 ## 구조 변경
